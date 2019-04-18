@@ -1,0 +1,254 @@
+
+<html>
+<head>
+<meta charset="utf-8">
+<title>无标题文档</title>
+<style>
+*{ margin:0; padding:0; font-size:14px}
+#box{ width:600px; margin:100px auto; table-layout: fixed;}
+table,th,td{ border:1px solid #000; border-collapse:collapse}
+td,th{ width:100px; height:30px; padding:10px}
+input[type="text"]{ display:none; height:24px; width:60px; border:1px solid #ccc;}
+tbody tr td:first-child{text-align: center;}
+tfoot td{text-align: right;}
+.editBtn{ color:#666}
+.delBtn{ color:red}
+.okBtn,.cancelBtn{ display:none}
+
+.edit span{ display:none}
+.edit input[type="text"]{ display:inline-block}
+.edit .editBtn,.edit .delBtn{ display:none}
+.edit .okBtn,.edit .cancelBtn{ display:inline}
+</style>
+
+</head>
+
+<body>
+<div>
+	<table id="box">
+		<thead>
+			<tr>
+	            <th>
+					<label>全选：<input type="checkbox" id="allCheck" class="allCheck"/></label><br>
+					<label>反选：<input type="checkbox" id="reCheck"/></label>
+				</th>
+	            <th>名称</th>
+	            <th>单价</th>
+	            <th>数量</th>
+	            <th>小结</th>
+	            <th>编辑</th>
+	        </tr>
+		</thead>
+        <tbody>
+	       <!-- <tr>
+	        	<td><input type="checkbox" class="check"/></td>
+	            <td><span>张三</span><input type="text"></td>
+	            <td><span>18</span><input type="text"></td>
+	            <td><span>1</span><input type="text"></td>
+				<td><span>18</span><input type="text"></td>
+	            <td>
+	            	<a href="javascript:;" class="editBtn">编辑</a>
+	            	<a href="javascript:;" class="okBtn">确定</a>
+	            	<a href="javascript:;" class="cancelBtn">取消</a>
+	            	<a href="javascript:;" class="delBtn">删除</a>
+	            </td>
+	        </tr> -->
+        </tbody>
+        <tfoot>
+        	<tr>
+        		<td colspan="6">总价：￥<b id="moneyContainer"></b></td>
+        	</tr>
+        </tfoot>
+   </table>
+</div>
+<script>
+	
+/* var box = document.getElementById("box");
+var allCheck = box.querySelector("#allCheck");
+console.log(allCheck) */
+	
+class Cart {
+	constructor(selector) {
+	    this.container = document.querySelector(selector);
+		this.tbody = this.container.querySelector("tbody");
+		this.allCheck = this.container.querySelector("#allCheck"); // 全选按钮
+		this.reCheck = this.container.querySelector("#reCheck"); // 反选按钮
+		this.moneyContainer = this.container.querySelector("#moneyContainer"); // 放总价的容器
+		this.check = null; // 所有的单选按钮(render查找)
+		
+		this.n = 0; // 被选中的单选的数量
+		this.allMoney = 0; // 总价
+		// json数据按理应该从后端获取(应该写在一个方法里),模拟自己手动写一个
+		this.json = [
+			{"name" : "鼠标", "price" : 100, "num" : 3},
+			{"name" : "键盘", "price" : 200, "num" : 4},
+			{"name" : "显示器", "price" : 1000, "num" : 2},
+			{"name" : "主机", "price" : 1500, "num" : 1}
+		];
+		this.render();
+		this.calcMoney();
+	}
+	
+	render () {
+		// 根据json渲染表格
+		let html = "";//let一个空字符串来接收json
+		this.json.forEach((item, index) => {
+			html += 
+				'<tr>'+
+					'<td><input type="checkbox" class="check"/></td>'+
+					'<td>'+item.name+'</td>'+
+					'<td>'+item.price+'</td>'+
+					'<td><span>'+item.num+'</span><input type="text"></td>'+
+					'<td><span>'+item.price * item.num+'</span><input type="text"></td>'+
+					'<td>'+
+						'<a href="javascript:;" class="editBtn">编辑</a>'+
+						'<a href="javascript:;" class="okBtn">确定</a>'+
+						'<a href="javascript:;" class="cancelBtn">取消</a>'+
+						'<a href="javascript:;" class="delBtn">删除</a>'+
+					'</td>'+
+				'</tr>';
+		});
+		this.tbody.innerHTML = html;//将html导入tbody中
+		this.check = Array.from(this.tbody.querySelectorAll(".check"));//获取所有的单选按钮并转为数组
+		// 为了确保添加进来的元素也能绑上事件
+		this.bindEvents();//调用事件函数
+	}
+	//绑定事件
+	bindEvents () {
+		let _this = this;//此处this是全局this
+		this.tbody.onclick = e => {
+			// 先把当前这一行的tr找到，作为实参传递
+			let tr = e.target.parentNode.parentNode;
+			switch(e.target.className) {
+				case "editBtn"   : this.editBtnClick(tr);   break;
+				case "okBtn"     : this.okBtnClick(tr);     break;
+				case "cancelBtn" : this.cancelBtnClick(tr); break;
+				case "delBtn"    : this.delBtnClick(tr);    break;
+			}
+		}
+		
+		// 给所有的单选绑事件
+		this.check.forEach(check => {
+			// check.onchange = this.checkChange.bind(this);
+			check.onchange = () => {
+				// console.log(check);
+				this.checkChange(check);
+			}
+			
+		})
+
+		// 给全选按钮绑事件
+		this.allCheck.onchange = this.allCheckChange.bind(this);
+            /*this.allCheck.onchange = () => {
+                this.allCheckChange();
+            };*/
+
+		// 给反选按钮绑事件
+		this.reCheck.onchange = this.reCheckChange.bind(this);
+        /*this.reCheck.onchange = () => {
+            this.reCheckChange();
+        };*/
+	}
+	//编辑按钮
+	editBtnClick (tr) {
+		tr.classList.add("edit");//给tr增加一个class名叫edit
+        //获取所有的span,遍历span,将span的HTML内容赋给input
+		Array.from(tr.querySelectorAll("span")).forEach(span => {
+			span.nextElementSibling.value = span.innerHTML;
+		})
+	}
+	//确认按钮
+	okBtnClick (tr) {
+		let aSpan = Array.from(tr.querySelectorAll("span"));//获取所有的span,并将其转为数组
+        //遍历所有的span,并将input的HTML内容赋给span
+		aSpan.forEach(span => {
+			span.innerHTML = span.nextElementSibling.value;
+		})
+		// 修改小结
+        let price = tr.querySelectorAll("td")[2]
+		aSpan[1].innerHTML = price.innerHTML * aSpan[0].innerHTML;
+		tr.classList.remove("edit");
+		// 计算总价
+		this.calcMoney();
+	}
+	//取消按钮
+	cancelBtnClick (tr) {
+		tr.classList.remove("edit");//将添加的class名取消
+	}
+	//删除按钮
+	delBtnClick (tr) {
+        //获取第二个td的HTML内容
+		let shopName = tr.querySelectorAll("td")[1].innerHTML;
+        //弹出确认框
+		if(confirm(`确认不要${shopName}了吗？`)) {
+			tr.remove();
+			// 因为一个tr被删除那么check也就被删除了，所以要重新获取一次check
+			this.check = Array.from(this.tbody.querySelectorAll(".check"));
+			// 再从剩下的check中重新计算n
+			this.n = 0;
+			this.check.forEach(check => {
+				if(check.checked) this.n++;
+			})
+		}
+		// 重新渲染全选的状态
+		this.allCheck.checked = this.n === this.check.length;
+		// 计算总价
+		this.calcMoney();
+	}
+	//单选按钮change事件
+	checkChange (check) {
+		// 修改选中单选的数量
+		this.n += check.checked ? 1 : -1;
+		this.allCheck.checked = this.n === this.check.length;
+		this.calcMoney();
+	}
+    //全选按钮change事件
+	allCheckChange () {
+		this.check.forEach(check => {
+			check.checked = this.allCheck.checked;
+		})
+		// 修改n的值
+		this.n = this.allCheck.checked ? this.check.length : 0;
+		// 计算总价
+		this.calcMoney();
+	}
+    //反选按钮change事件
+	reCheckChange () {
+		// 把所有的单选状态反向
+		this.check.forEach(check => {
+			check.checked = !check.checked;
+		})
+		// n的反向（length-n）
+		this.n = this.check.length - this.n;
+		// 判断是否全选
+		this.allCheck.checked = this.n === this.check.length;
+		// 计算总价
+		this.calcMoney();
+
+	}
+	//计算总结事件
+	calcMoney () {
+		//console.log(this.n);
+		//console.log(this.check);
+		// 每次重置为0，从头算
+		this.allMoney = 0;
+		// 找到所有的tr
+		let aTr = Array.from(this.tbody.children);
+		aTr.forEach(tr => {
+			// 判断当前商品是否选中
+			if(tr.querySelector(".check").checked){
+                //console.log(tr.querySelector(".check"));
+				this.allMoney += Number(tr.querySelectorAll("span")[1].innerHTML);
+			}
+		})
+		this.moneyContainer.innerHTML = this.allMoney;
+	}
+	
+	
+}
+new Cart("#box");
+
+
+</script>
+</body>
+</html>
